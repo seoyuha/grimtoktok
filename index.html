@@ -1153,8 +1153,9 @@ input:focus,textarea:focus,select:focus{outline:4px solid #FFE27A;border-color:#
 @keyframes pinshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
 .pincat{width:110px;height:auto}
 .pinmsg{font-family:'Jua';font-size:18px;color:#5A3416}.pinmsg.bad{color:#E0302F}
-.pindots{display:flex;gap:12px;margin:4px 0}.pindots i{width:20px;height:20px;border-radius:50%;border:3px solid #C49A63;background:#FFFDF6}.pindots i.on{background:#FF5C93;border-color:#C93670}
-#pinIn{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+/*x*/.pindots{display:flex;gap:12px;margin:4px 0}.pindots i{width:20px;height:20px;border-radius:50%;border:3px solid #C49A63;background:#FFFDF6}.pindots i.on{background:#FF5C93;border-color:#C93670}
+#pinIn{width:min(300px,70vw);font-family:'Jua';font-size:24px;text-align:center;padding:10px 14px;border:4px solid #D9B27C;border-radius:16px;background:#FFFDF6}
+.pinrow{display:flex;align-items:center;gap:6px}.pineye{border:3px solid #D9B27C;background:#FFF3D6;border-radius:12px;width:48px;height:48px;font-size:20px;cursor:pointer}
 .pinpad{display:grid;grid-template-columns:repeat(3,92px);gap:6px}.pinpad .btn{font-size:24px;min-height:0;white-space:nowrap;width:auto;padding:3px 0 5px!important}.pinpad .btn.exit,.pinpad .btn.mint{font-size:18px}
 </style>
 <script>
@@ -1451,8 +1452,8 @@ const FIREBASE_CONFIG = {
   appId: "1:714246269849:web:44f9ce4c4d5a4f28bbc108"
 };
 const ROOT = 'doodle';
-/* 선생님 관리 비밀번호 — 숫자 4~8자리. 바꾸려면 따옴표 안 숫자만 고쳐 주세요 */
-const TEACHER_PIN = '0613';
+/* 선생님 관리 비밀번호 — 비밀번호 자체가 아니라 SHA-256 값만 저장해요 */
+const TEACHER_PIN_HASH = '6e8cf0c52e9e7a891da31301f3ff45fd1a49bf48fb0c6ec1ca109c884102c121';
 
 /* ================= helpers ================= */
 const $ = s => document.querySelector(s);
@@ -1830,18 +1831,17 @@ const unsubs=[]; function clearSubs(){ while(unsubs.length){ try{unsubs.pop()()}
 function joinURL(){ return location.origin+location.pathname+'?code='+CODE+(USE_FB?'':'&local=1'); }
 
 function goHome(){ clearSubs(); stopAuto(); syncDone(false); ROLE=''; show('vHome'); history.replaceState(null,'',location.pathname+(USE_FB?'':(QS.has('local')?'?local=1':''))); }
-function goTeacherStart(){ if(sessionStorage.getItem('gtt_tpin')!==TEACHER_PIN) return askPin(); openTeacherStart(); }
-let pinBuf='';
-function askPin(){ pinBuf=''; openModal(`<div class="plankwrap" style="margin:0 0 12px"><h2 class="plank">🔒 선생님 비밀번호</h2></div>
+function goTeacherStart(){ if(sessionStorage.getItem('gtt_tok')!==TEACHER_PIN_HASH) return askPin(); openTeacherStart(); }
+async function sha256(t){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function askPin(){ openModal(`<div class="plankwrap" style="margin:0 0 12px"><h2 class="plank">🔒 선생님 비밀번호</h2></div>
   <div class="pinbox"><img src="${ASSET.hc_cat}" alt="" class="pincat"><div class="pinmsg" id="pinMsg">선생님 관리 화면은 비밀번호가 필요해요</div>
-  <div class="pindots" id="pinDots">${'<i></i>'.repeat(TEACHER_PIN.length)}</div>
-  <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="비밀번호" onkeydown="if(event.key==='Enter')pinCheck()" oninput="pinBuf=this.value.replace(/\D/g,'');this.value=pinBuf;pinDraw();if(pinBuf.length>=TEACHER_PIN.length)pinCheck()">
-  <div class="pinpad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="btn" onclick="pinKey('${n}')">${n}</button>`).join('')}<button class="btn exit" onclick="pinKey('del')">지우기</button><button class="btn" onclick="pinKey('0')">0</button><button class="btn mint" onclick="pinCheck()">확인</button></div>
-  <button class="btn sm" style="margin-top:10px" onclick="closeModal()">학생 화면으로 돌아가기</button></div>`); setTimeout(()=>{ const i=$('#pinIn'); if(i) i.focus(); },50); }
-function pinDraw(){ const d=document.querySelectorAll('#pinDots i'); d.forEach((x,k)=>x.classList.toggle('on',k<pinBuf.length)); const i=$('#pinIn'); if(i) i.value=pinBuf; }
-function pinKey(k){ if(k==='del') pinBuf=pinBuf.slice(0,-1); else if(pinBuf.length<8) pinBuf+=k; pinDraw(); if(pinBuf.length>=TEACHER_PIN.length) setTimeout(pinCheck,120); }
-function pinCheck(){ if(pinBuf===TEACHER_PIN){ sessionStorage.setItem('gtt_tpin',TEACHER_PIN); closeModal(); openTeacherStart(); return; }
-  if(!pinBuf) return; pinBuf=''; pinDraw(); const b=document.querySelector('.pinbox'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); $('#pinMsg').textContent='비밀번호가 달라요. 다시 눌러 주세요'; $('#pinMsg').classList.add('bad'); }
+  <div class="pinrow"><input id="pinIn" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" maxlength="40" placeholder="비밀번호" onkeydown="if(event.key==='Enter')pinCheck()">
+  <button class="pineye" type="button" title="비밀번호 보기" onclick="const i=$('#pinIn');i.type=i.type==='password'?'text':'password';i.focus()">👁</button></div>
+  <div class="row" style="justify-content:center;gap:8px;margin-top:6px"><button class="btn sm" onclick="closeModal()">학생 화면으로</button><button class="btn mint" onclick="pinCheck()">확인</button></div></div>`);
+  setTimeout(()=>{ const i=$('#pinIn'); if(i) i.focus(); },60); }
+async function pinCheck(){ const i=$('#pinIn'); const v=(i&&i.value||'').trim(); if(!v) return;
+  if(await sha256(v)===TEACHER_PIN_HASH){ sessionStorage.setItem('gtt_tok',TEACHER_PIN_HASH); closeModal(); openTeacherStart(); return; }
+  i.value=''; i.focus(); const b=document.querySelector('.pinbox'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); $('#pinMsg').textContent='비밀번호가 달라요. 다시 입력해 주세요'; $('#pinMsg').classList.add('bad'); }
 function openTeacherStart(){ $('#tsCode').value=localStorage.getItem('doodle_last_code')||''; show('vTStart'); }
 let SJ_AV=0;
 function goStudentJoin(){ clearSubs(); ROLE=''; $('#sjCode').value=(QS.get('code')||localStorage.getItem('doodle_s_code')||'').toUpperCase(); $('#sjName').value=localStorage.getItem('doodle_s_name')||''; sjBack(); show('vSJoin'); }
